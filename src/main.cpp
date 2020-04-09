@@ -57,10 +57,12 @@ int main() {
 
   //have a reference velocity to target
   double ref_vel=0.0; //mph
+
+  int lane_change_time=0;
   
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
-               &map_waypoints_dx,&map_waypoints_dy,&lane,&ref_vel]
+               &map_waypoints_dx,&map_waypoints_dy,&lane,&ref_vel,&lane_change_time]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -143,6 +145,7 @@ int main() {
           bool plc=false;
           bool lcl=false;
           bool lcr=false;
+          lane_change_time++;
 
           //set finite state
           //no car in front within 30m, lanekeep default state
@@ -176,22 +179,18 @@ int main() {
             lcl=false;
             lcr=false;
             //if there is a left lane and is safe to change to left, lane change to left state
-            if(lane-1>=0 && (!lfront.init||(lfront.init&&lfront.check_car_s-car_s>20)) && (!lrear.init||(lrear.init && car_s-lrear.check_car_s>10)))
+            if(lane-1>=0 && lane_change_time>100 && (!lfront.init||(lfront.init&&lfront.check_car_s-car_s>20)) && (!lrear.init||(lrear.init && car_s-lrear.check_car_s>10&&lrear.speed-1<car_speed)))
             {
-              lk_default=false;
-              lk_follow=false;
               plc=false;
               lcl=true;
-              lcr=false;
+              lane_change_time=0;
             }
             //if there is a right lane and is safe to change to right, lane change to right state
-            else if(lane+1<=2 && (!rfront.init||(rfront.init&&rfront.check_car_s-car_s>20)) && (!rrear.init||(rrear.init && car_s-rrear.check_car_s>10)))
+            else if(lane+1<=2 && lane_change_time>100 &&(!rfront.init||(rfront.init&&rfront.check_car_s-car_s>20)) && (!rrear.init||(rrear.init && car_s-rrear.check_car_s>10&&rrear.speed-1<car_speed)))
             {
-              lk_default=false;
-              lk_follow=false;
               plc=false;
-              lcl=false;
               lcr=true;
+              lane_change_time=0;
             }
           }
           //corresponding behavior to different state
@@ -212,7 +211,7 @@ int main() {
             {
               follow_speed=2.23694 * (front.speed-10);
             }
-            double adjustment = (follow_speed - car_speed) / follow_speed * .224 * 1.5;
+            double adjustment = (follow_speed - car_speed) / follow_speed * .224 * 2;
             if (abs(adjustment) > .224)
             {
 				      if (adjustment < 0) adjustment = -.224;
@@ -229,7 +228,7 @@ int main() {
             {
               follow_speed=2.23694 * (front.speed-10);
             }
-            double adjustment = (follow_speed - car_speed) / follow_speed * .224 * 1.5;
+            double adjustment = (follow_speed - car_speed) / follow_speed * .224 * 2;
             if (abs(adjustment) > .224)
             {
 				      if (adjustment < 0) adjustment = -.224;
